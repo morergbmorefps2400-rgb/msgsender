@@ -307,7 +307,24 @@
         </div>
     </div>
 
-<script>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // Your freshly provided database sync credentials
+    const firebaseConfig = {
+        apiKey: "AIzaSyCDVoIby_e-zYiPL-_I-IoVnanLOwI73gE",
+        authDomain: "sending-ea3b5.firebaseapp.com",
+        projectId: "sending-ea3b5",
+        storageBucket: "sending-ea3b5.firebasestorage.app",
+        messagingSenderId: "89941728028",
+        appId: "1:89941728028:web:9fe8511e29fd0b50a4b8d9"
+    };
+
+    // Initialize Database Core Engine
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    
     // Configuration - Change your store details here!
     const STORE_NAME = "Ammaah Optics";
     const STORE_ADDRESS = "Patuatuli, Dhaka-1100";
@@ -488,10 +505,10 @@
     window.clearLogFilters = function() {
         document.getElementById('logSearchInput').value = '';
         document.getElementById('logDateInput').value = '';
-        render();
+        window.render();
     };
 
-    function render() {
+    window.render = function() {
         // 1. Render Customer Select Dropdown
         const dropdown = document.getElementById('txCustId');
         dropdown.innerHTML = '<option value="">-- Choose Customer --</option>';
@@ -557,7 +574,7 @@
     }
 
     // Run on startup
-    render();
+    window.render();
 </script>
 </body>
 </html>
