@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Ledger & Due Tracker</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --dark: #1e293b;
+            --light: #f8fafc;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f1f5f9;
+            color: var(--dark);
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .store-info {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h2 { 
+            margin-top: 0; 
+            color: var(--primary); 
+            font-size: 1.25rem; 
+            border-bottom: 2px solid #e2e8f0; 
+            padding-bottom: 8px;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        button.btn-success { background: var(--success); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th { background: #f8fafc; }
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            width: auto;
+            background: #16a34a;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-sm:hover {
+            background: #15803d;
+        }
+
+        /* --- New Professional Dashboard Grid Layout --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .dash-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .dash-card:active {
+            transform: scale(0.95);
+            background: #f8fafc;
+        }
+        .dash-card .icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .dash-card h3 {
+            margin: 0;
+            font-size: 14px;
+            color: #1e293b;
+            font-weight: 600;
+        }
+        /* App Router Content Pages Configuration */
+        .app-page {
+            display: none; /* Hidden on initial launch */
+        }
+        .app-page.active-page {
+            display: block; /* Visible target view */
+        }
+        .back-btn {
+            background: #64748b;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            font-size: 13px;
+            width: auto;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1 id="storeNameDisplay">My Awesome Store</h1>
+        <p class="store-info" id="storeDetailsDisplay">Address: Dhaka, Bangladesh | Phone: +880123456789</p>
+    </header>
+
+    <div id="dashboardMenu">
+        <div class="dashboard-grid">
+            <div class="dash-card" onclick="showPage('pageRegister')">
+                <div class="icon">👤</div>
+                <h3>Register New Customer</h3>
+            </div>
+            <div class="dash-card" onclick="showPage('pageTransaction')">
+                <div class="icon">💰</div>
+                <h3>Collect Payment / Add Due</h3>
+            </div>
+            <div class="dash-card" onclick="showPage('pageBalances')">
+                <div class="icon">📋</div>
+                <h3>Customer Balances Summary</h3>
+            </div>
+            <div class="dash-card" onclick="showPage('pageLogs')">
+                <div class="icon">📜</div>
+                <h3>Daily Transaction History Log</h3>
+            </div>
+        </div>
+    </div>
+
+    <div id="pageRegister" class="app-page">
+        <button class="back-btn" onclick="showDashboard()">⬅️ Back to Dashboard</button>
+        <div class="card">
+            <h2>1. Register New Customer</h2>
+            <form id="customerForm">
+                <div class="form-group">
+                    <label>Unique Customer ID</label>
+                    <input type="text" id="custId" placeholder="e.g., CUST-101" required>
+                </div>
+                <div class="form-group">
+                    <label>Customer Name</label>
+                    <input type="text" id="custName" placeholder="John Doe" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="text" id="custPhone" placeholder="8801xxxxxxxxx" required>
+                </div>
+                <div class="form-group">
+                    <label>Initial Due Balance (Tk)</label>
+                    <input type="number" id="custBalance" value="0" required>
+                </div>
+                <button type="submit">Add Customer</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="pageTransaction" class="app-page">
+        <button class="back-btn" onclick="showDashboard()">⬅️ Back to Dashboard</button>
+        <div class="card">
+            <h2>2. Collect Payment / Add Due</h2>
+            <form id="transactionForm">
+                <div class="form-group">
+                    <label>Select Customer</label>
+                    <select id="txCustId" required>
+                        <option value="">-- Choose Customer --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date of Collection</label>
+                    <input type="date" id="txDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Transaction Type</label>
+                    <select id="txType" required>
+                        <option value="payment">Payment Received (Reduces Due)</option>
+                        <option value="due">Credit Sale (Increases Due)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount (Tk)</label>
+                    <input type="number" id="txAmount" placeholder="50" required>
+                </div>
+                <div class="form-group">
+                    <label>Collected By / Method</label>
+                    <select id="txMethod" required>
+                        <option value="Cash">Cash</option>
+                        <option value="bKash">bKash</option>
+                        <option value="Nagad">Nagad</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-success">Submit Transaction</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="pageBalances" class="app-page">
+        <button class="back-btn" onclick="showDashboard()">⬅️ Back to Dashboard</button>
+        <div class="card">
+            <h2>Customer Balances Summary</h2>
+            <div style="overflow-x: auto;">
+                <table id="customerTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Current Balance (Tk)</th>
+                            <th>Actions</th> 
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+   <div id="pageLogs" class="app-page">
+        <button class="back-btn" onclick="showDashboard()">⬅️ Back to Dashboard</button>
+        <div class="card">
+            <h2>Daily Transaction History Log</h2>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 200px;">
+                    <label>🔎 Search Name or ID</label>
+                    <input type="text" id="logSearchInput" placeholder="Type name or ID..." oninput="render()">
+                </div>
+                <div style="flex: 1; min-width: 150px;">
+                    <label>📅 Filter by Date</label>
+                    <input type="date" id="logDateInput" onchange="render()">
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button type="button" onclick="clearLogFilters()" style="background: #64748b; padding: 8px 12px; font-size: 13px; width: auto; height: 38px;">Clear</button>
+                </div>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>ID & Name</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Method/By</th>
+                            <th>Calculation Breakdown</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // Configuration - Change your store details here!
+    const STORE_NAME = "Ammaah Optics";
+    const STORE_ADDRESS = "Patuatuli, Dhaka -1100";
+    const STORE_PHONE = "01925771759";
+
+    // App Data Initialization
+    let customers = JSON.parse(localStorage.getItem('ledger_customers')) || [];
+    let transactions = JSON.parse(localStorage.getItem('ledger_transactions')) || [];
+
+    document.getElementById('storeNameDisplay').innerText = STORE_NAME;
+    document.getElementById('storeDetailsDisplay').innerText = `Address: ${STORE_ADDRESS} | Phone: ${STORE_PHONE}`;
+    document.getElementById('txDate').valueAsDate = new Date();
+
+    // Navigation Logic: View individual interface pages
+    window.showPage = function(pageId) {
+        document.getElementById('dashboardMenu').style.display = 'none';
+        document.querySelectorAll('.app-page').forEach(page => {
+            page.classList.remove('active-page');
+        });
+        document.getElementById(pageId).classList.add('active-page');
+    };
+
+    // Navigation Logic: Return back to core dashboard screen
+    window.showDashboard = function() {
+        document.querySelectorAll('.app-page').forEach(page => {
+            page.classList.remove('active-page');
+        });
+        document.getElementById('dashboardMenu').style.display = 'block';
+        render(); // Dynamic update execution on return
+    };
+
+    // Handle Adding New Customer
+    document.getElementById('customerForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = document.getElementById('custId').value.trim();
+        const name = document.getElementById('custName').value.trim();
+        let phone = document.getElementById('custPhone').value.trim();
+        const initialBalance = parseFloat(document.getElementById('custBalance').value) || 0;
+
+        if(!phone.startsWith('88')) {
+            phone = '88' + phone;
+        }
+
+        if (customers.some(c => c.id === id)) {
+            alert("This Customer ID already exists!");
+            return;
+        }
+
+        customers.push({ id, name, phone, balance: initialBalance });
+        saveData();
+        render();
+        document.getElementById('customerForm').reset();
+        showDashboard(); // Automatically return to menu after adding
+    });
+
+    // Automatically disable/enable Method dropdown based on Type selection
+    document.getElementById('txType').addEventListener('change', (e) => {
+        const methodDropdown = document.getElementById('txMethod');
+        
+        if (e.target.value === 'due') {
+            methodDropdown.disabled = true;
+            methodDropdown.required = false; 
+            methodDropdown.value = ""; 
+            methodDropdown.style.backgroundColor = "#e2e8f0";
+        } else {
+            methodDropdown.disabled = false;
+            methodDropdown.required = true;
+            methodDropdown.style.backgroundColor = "";
+        }
+    });
+
+    // Handle Adding Transactions
+    document.getElementById('transactionForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const custId = document.getElementById('txCustId').value;
+        const date = document.getElementById('txDate').value;
+        const type = document.getElementById('txType').value;
+        const amount = parseFloat(document.getElementById('txAmount').value) || 0;
+        const method = document.getElementById('txMethod').value;
+        const finalMethod = type === 'payment' ? method : 'N/A (Credit)';
+
+        const customer = customers.find(c => c.id === custId);
+        if (!customer) return;
+
+        const previousBalance = customer.balance;
+
+        if (type === 'payment') {
+            customer.balance -= amount;
+        } else {
+            customer.balance += amount;
+        }
+
+        transactions.unshift({
+            txId: Date.now(),
+            date,
+            custId,
+            custName: customer.name,
+            custPhone: customer.phone,
+            type: type === 'payment' ? 'Payment Received' : 'Credit Sale',
+            amount,
+            method: finalMethod,
+            prevBal: previousBalance,
+            currBal: customer.balance
+        });
+
+        saveData();
+        render();
+        document.getElementById('txAmount').value = '';
+        showDashboard(); // Automatically return to menu after submitting
+    });
+
+    function saveData() {
+        localStorage.setItem('ledger_customers', JSON.stringify(customers));
+        localStorage.setItem('ledger_transactions', JSON.stringify(transactions));
+    }
+
+    // Function to Generate and Send Custom WhatsApp Receipts
+    window.sendReceipt = function(txId) {
+        const tx = transactions.find(t => t.txId === txId);
+        if (!tx) return;
+
+        const originalDate = tx.date;
+        const dateParts = originalDate.split('-');
+        const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+
+        let msg = "";
+
+        if (tx.type === 'Payment Received') {
+            msg = `Dear *${tx.custName}*,\n\n`;
+            msg += `Your payment has been received successfully. ✅\n\n`;
+            msg += `🧾 *PAYMENT RECEIPT*\n\n`;
+            msg += `📅 Date: ${formattedDate}\n`;
+            msg += `💳 Transaction Type: ${tx.type}\n`;
+            msg += `💰 Amount Received: ৳${tx.amount}\n`;
+            msg += `⚙️ Payment Method: ${tx.method}\n\n`;
+            msg += `📊 *ACCOUNT SUMMARY*\n\n`;
+            msg += `📉 Previous Balance: ৳${tx.prevBal}\n`;
+            msg += `🔹 Amount Paid: ৳${tx.amount}\n`;
+            msg += `*✅ Current Balance: ৳${tx.currBal}*\n\n`;
+            msg += `Thank you for your payment. 🙏\n\n`;
+            msg += `*"${STORE_NAME}"*`;
+        } else {
+            msg = `Dear *${tx.custName}*,\n\n`;
+            msg += `A credit sale has been recorded successfully. 🛒\n\n`;
+            msg += `📦 *CREDIT SALE RECEIPT*\n\n`;
+            msg += `📅 Date: ${formattedDate}\n`;
+            msg += `📝 Transaction Type: ${tx.type}\n`;
+            msg += `🛍️ Sale Amount: ৳${tx.amount}\n\n`;
+            msg += `📊 *ACCOUNT SUMMARY*\n\n`;
+            msg += `📈 Previous Balance: ৳${tx.prevBal}\n`;
+            msg += `🔸 New Credit: ৳${tx.amount}\n`;
+            msg += `*⚠️ Current Balance: ৳${tx.currBal}*\n\n`;
+            msg += `Thank you for your purchase. 👍\n\n`;
+            msg += `*"${STORE_NAME}"*`;
+        }
+
+        const encodedMsg = encodeURIComponent(msg);
+        const url = `https://api.whatsapp.com/send?phone=${tx.custPhone}&text=${encodedMsg}`;
+        window.open(url, '_blank');
+    };
+
+    // Function to Delete a Customer with Confirmation
+    window.deleteCustomer = function(id) {
+        const customer = customers.find(c => c.id === id);
+        if (!customer) return;
+
+        const confirmDelete = confirm(`Are you sure you want to delete the customer "${customer.name}" (ID: ${customer.id})?`);
+        
+        if (confirmDelete) {
+            customers = customers.filter(c => c.id !== id);
+            transactions = transactions.filter(t => t.custId !== id);
+            saveData();
+            render();
+        }
+    };
+    // Clear both search and date filters
+    window.clearLogFilters = function() {
+        document.getElementById('logSearchInput').value = '';
+        document.getElementById('logDateInput').value = '';
+        render();
+    };
+
+    function render() {
+        // 1. Render Customer Select Dropdown
+        const dropdown = document.getElementById('txCustId');
+        dropdown.innerHTML = '<option value="">-- Choose Customer --</option>';
+        customers.forEach(c => {
+            dropdown.innerHTML += `<option value="${c.id}">${c.name} (${c.id})</option>`;
+        });
+
+        // 2. Render Customers Table
+        const custBody = document.querySelector('#customerTable tbody');
+        custBody.innerHTML = '';
+        customers.forEach(c => {
+            custBody.innerHTML += `
+                <tr>
+                    <td>${c.id}</td>
+                    <td>${c.name}</td>
+                    <td>${c.phone}</td>
+                    <td><strong>${c.balance} Tk</strong></td>
+                    <td>
+                        <button class="btn-sm" style="background: #dc2626;" onclick="deleteCustomer('${c.id}')">🗑️ Delete</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        // 3. Filter and Render Transaction History Table
+        const txBody = document.querySelector('#historyTable tbody');
+        txBody.innerHTML = '';
+
+        // Get filter values
+        const searchQuery = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value.toLowerCase().trim() : '';
+        const filterDate = document.getElementById('logDateInput') ? document.getElementById('logDateInput').value : '';
+
+        // Filter transaction list dynamically
+        const filteredTransactions = transactions.filter(t => {
+            const matchesSearch = t.custName.toLowerCase().includes(searchQuery) || t.custId.toLowerCase().includes(searchQuery);
+            const matchesDate = filterDate === '' || t.date === filterDate;
+            return matchesSearch && matchesDate;
+        });
+
+        // Draw only the filtered results
+        filteredTransactions.forEach(t => {
+            txBody.innerHTML += `
+                <tr>
+                    <td>${t.date}</td>
+                    <td><strong>(${t.custId})</strong> ${t.custName}</td>
+                    <td style="color: ${t.type.includes('Received') ? 'green':'red'}">${t.type}</td>
+                    <td><strong>${t.amount} Tk</strong></td>
+                    <td>${t.method}</td>
+                    <td>
+                        <small>
+                            ${t.prevBal} 
+                            ${t.type === 'Payment Received' ? '-' : '+'} 
+                            ${t.amount} = 
+                            <strong>${t.currBal} Tk</strong>
+                        </small>
+                    </td>
+                    <td>
+                        <button class="btn-sm" onclick="sendReceipt(${t.txId})">📩 Send Receipt</button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // Run on startup
+    render();
+</script>
+</body>
+</html>
