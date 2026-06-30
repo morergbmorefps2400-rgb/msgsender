@@ -307,21 +307,61 @@
         </div>
     </div>
 
-<script>
-    // Configuration - Change your store details here!
-    const STORE_NAME = "Ammaah Optics";
-    const STORE_ADDRESS = "Patuatuli, Dhaka -1100";
-    const STORE_PHONE = "01925771759";
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // App Data Initialization
-    let customers = JSON.parse(localStorage.getItem('ledger_customers')) || [];
-    let transactions = JSON.parse(localStorage.getItem('ledger_transactions')) || [];
+    // Your Web App's Firebase Configuration
+    const firebaseConfig = {
+        apiKey: "AIzaSyAV8Gv4MtVsC9LxsqKCgZaUAzcputpx_A8",
+        authDomain: "msgsender-2a1c9.firebaseapp.com",
+        projectId: "msgsender-2a1c9",
+        storageBucket: "msgsender-2a1c9.firebasestorage.app",
+        messagingSenderId: "412073628640",
+        appId: "1:412073628640:web:802d419e1783675baa1185",
+        measurementId: "G-F3CQX0QX69"
+    };
 
+    // Initialize Firebase & Firestore
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Core Business Configuration Details
+    const STORE_NAME = "M/S RAHMAN TRADERS";
+    const STORE_ADDRESS = "Mirpur, Dhaka, Bangladesh";
+    const STORE_PHONE = "+8801700000000";
+
+    // Application Global Memory Arrays
+    let customers = [];
+    let transactions = [];
+
+    // Set Header UI Info
     document.getElementById('storeNameDisplay').innerText = STORE_NAME;
     document.getElementById('storeDetailsDisplay').innerText = `Address: ${STORE_ADDRESS} | Phone: ${STORE_PHONE}`;
     document.getElementById('txDate').valueAsDate = new Date();
 
-    // Navigation Logic: View individual interface pages
+    // --- AUTOMATIC REAL-TIME SYNC FROM CLOUD ---
+    // Listen to Customers Collection
+    onSnapshot(collection(db, "customers"), (snapshot) => {
+        customers = [];
+        snapshot.forEach((doc) => {
+            customers.push(doc.data());
+        });
+        render();
+    });
+
+    // Listen to Transactions Collection
+    onSnapshot(collection(db, "transactions"), (snapshot) => {
+        transactions = [];
+        snapshot.forEach((doc) => {
+            transactions.push(doc.data());
+        });
+        // Sort transactions so the newest ones are always at the top
+        transactions.sort((a, b) => b.txId - a.txId);
+        render();
+    });
+
+    // --- NAVIGATION ROUTING LOGIC ---
     window.showPage = function(pageId) {
         document.getElementById('dashboardMenu').style.display = 'none';
         document.querySelectorAll('.app-page').forEach(page => {
@@ -330,17 +370,16 @@
         document.getElementById(pageId).classList.add('active-page');
     };
 
-    // Navigation Logic: Return back to core dashboard screen
     window.showDashboard = function() {
         document.querySelectorAll('.app-page').forEach(page => {
             page.classList.remove('active-page');
         });
         document.getElementById('dashboardMenu').style.display = 'block';
-        render(); // Dynamic update execution on return
+        render();
     };
 
-    // Handle Adding New Customer
-    document.getElementById('customerForm').addEventListener('submit', (e) => {
+    // --- REGISTER CUSTOMER (SAVE TO CLOUD) ---
+    document.getElementById('customerForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('custId').value.trim();
         const name = document.getElementById('custName').value.trim();
@@ -356,17 +395,21 @@
             return;
         }
 
-        customers.push({ id, name, phone, balance: initialBalance });
-        saveData();
-        render();
-        document.getElementById('customerForm').reset();
-        showDashboard(); // Automatically return to menu after adding
+        const customerData = { id, name, phone, balance: initialBalance };
+
+        try {
+            // Write directly to Firestore customer folder
+            await setDoc(doc(db, "customers", id), customerData);
+            document.getElementById('customerForm').reset();
+            showDashboard();
+        } catch (error) {
+            alert("Error adding customer: " + error.message);
+        }
     });
 
-    // Automatically disable/enable Method dropdown based on Type selection
+    // UI Toggle for Transactions Form
     document.getElementById('txType').addEventListener('change', (e) => {
         const methodDropdown = document.getElementById('txMethod');
-        
         if (e.target.value === 'due') {
             methodDropdown.disabled = true;
             methodDropdown.required = false; 
@@ -379,8 +422,8 @@
         }
     });
 
-    // Handle Adding Transactions
-    document.getElementById('transactionForm').addEventListener('submit', (e) => {
+    // --- SUBMIT TRANSACTION (SAVE TO CLOUD & BALANCE AUTO-SYNC) ---
+    document.getElementById('transactionForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const custId = document.getElementById('txCustId').value;
         const date = document.getElementById('txDate').value;
@@ -393,15 +436,17 @@
         if (!customer) return;
 
         const previousBalance = customer.balance;
+        let newBalance = previousBalance;
 
         if (type === 'payment') {
-            customer.balance -= amount;
+            newBalance -= amount;
         } else {
-            customer.balance += amount;
+            newBalance += amount;
         }
 
-        transactions.unshift({
-            txId: Date.now(),
+        const txId = Date.now().toString();
+        const transactionData = {
+            txId: parseInt(txId),
             date,
             custId,
             custName: customer.name,
@@ -410,58 +455,35 @@
             amount,
             method: finalMethod,
             prevBal: previousBalance,
-            currBal: customer.balance
-        });
+            currBal: newBalance
+        };
 
-        saveData();
-        render();
-        document.getElementById('txAmount').value = '';
-        showDashboard(); // Automatically return to menu after submitting
+        try {
+            // 1. Update the Customer's Balance in the cloud
+            await setDoc(doc(db, "customers", custId), { ...customer, balance: newBalance });
+            // 2. Save the Transaction entry into the cloud history folder
+            await setDoc(doc(db, "transactions", txId), transactionData);
+
+            document.getElementById('txAmount').value = '';
+            showDashboard();
+        } catch (error) {
+            alert("Transaction error: " + error.message);
+        }
     });
 
-    function saveData() {
-        localStorage.setItem('ledger_customers', JSON.stringify(customers));
-        localStorage.setItem('ledger_transactions', JSON.stringify(transactions));
-    }
-
-    // Function to Generate and Send Custom WhatsApp Receipts
+    // --- WHATSAPP LOGIC ---
     window.sendReceipt = function(txId) {
         const tx = transactions.find(t => t.txId === txId);
         if (!tx) return;
 
-        const originalDate = tx.date;
-        const dateParts = originalDate.split('-');
+        const dateParts = tx.date.split('-');
         const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-
         let msg = "";
 
         if (tx.type === 'Payment Received') {
-            msg = `Dear *${tx.custName}*,\n\n`;
-            msg += `Your payment has been received successfully. ✅\n\n`;
-            msg += `🧾 *PAYMENT RECEIPT*\n\n`;
-            msg += `📅 Date: ${formattedDate}\n`;
-            msg += `💳 Transaction Type: ${tx.type}\n`;
-            msg += `💰 Amount Received: ৳${tx.amount}\n`;
-            msg += `⚙️ Payment Method: ${tx.method}\n\n`;
-            msg += `📊 *ACCOUNT SUMMARY*\n\n`;
-            msg += `📉 Previous Balance: ৳${tx.prevBal}\n`;
-            msg += `🔹 Amount Paid: ৳${tx.amount}\n`;
-            msg += `*✅ Current Balance: ৳${tx.currBal}*\n\n`;
-            msg += `Thank you for your payment. 🙏\n\n`;
-            msg += `*"${STORE_NAME}"*`;
+            msg = `Dear *${tx.custName}*,\n\nYour payment has been received successfully. ✅\n\n🧾 *PAYMENT RECEIPT*\n\n📅 Date: ${formattedDate}\n💳 Transaction Type: ${tx.type}\n💰 Amount Received: ৳${tx.amount}\n⚙️ Payment Method: ${tx.method}\n\n📊 *ACCOUNT SUMMARY*\n\n📉 Previous Balance: ৳${tx.prevBal}\n🔹 Amount Paid: ৳${tx.amount}\n*✅ Current Balance: ৳${tx.currBal}*\n\nThank you for your payment. 🙏\n\n*"${STORE_NAME}"*`;
         } else {
-            msg = `Dear *${tx.custName}*,\n\n`;
-            msg += `A credit sale has been recorded successfully. 🛒\n\n`;
-            msg += `📦 *CREDIT SALE RECEIPT*\n\n`;
-            msg += `📅 Date: ${formattedDate}\n`;
-            msg += `📝 Transaction Type: ${tx.type}\n`;
-            msg += `🛍️ Sale Amount: ৳${tx.amount}\n\n`;
-            msg += `📊 *ACCOUNT SUMMARY*\n\n`;
-            msg += `📈 Previous Balance: ৳${tx.prevBal}\n`;
-            msg += `🔸 New Credit: ৳${tx.amount}\n`;
-            msg += `*⚠️ Current Balance: ৳${tx.currBal}*\n\n`;
-            msg += `Thank you for your purchase. 👍\n\n`;
-            msg += `*"${STORE_NAME}"*`;
+            msg = `Dear *${tx.custName}*,\n\nA credit sale has been recorded successfully. 🛒\n\n📦 *CREDIT SALE RECEIPT*\n\n📅 Date: ${formattedDate}\n📝 Transaction Type: ${tx.type}\n🛍️ Sale Amount: ৳${tx.amount}\n\n📊 *ACCOUNT SUMMARY*\n\n📈 Previous Balance: ৳${tx.prevBal}\n🔸 New Credit: ৳${tx.amount}\n*⚠️ Current Balance: ৳${tx.currBal}*\n\nThank you for your purchase. 👍\n\n*"${STORE_NAME}"*`;
         }
 
         const encodedMsg = encodeURIComponent(msg);
@@ -469,94 +491,83 @@
         window.open(url, '_blank');
     };
 
-    // Function to Delete a Customer with Confirmation
-    window.deleteCustomer = function(id) {
+    // --- DELETE CUSTOMER FROM CLOUD ---
+    window.deleteCustomer = async function(id) {
         const customer = customers.find(c => c.id === id);
         if (!customer) return;
 
-        const confirmDelete = confirm(`Are you sure you want to delete the customer "${customer.name}" (ID: ${customer.id})?`);
-        
+        const confirmDelete = confirm(`Are you sure you want to delete "${customer.name}"?`);
         if (confirmDelete) {
-            customers = customers.filter(c => c.id !== id);
-            transactions = transactions.filter(t => t.custId !== id);
-            saveData();
-            render();
+            try {
+                // Delete from cloud collections
+                await deleteDoc(doc(db, "customers", id));
+                
+                // Clear linked transactions in cloud
+                const linkedTx = transactions.filter(t => t.custId === id);
+                for (let tx of linkedTx) {
+                    await deleteDoc(doc(db, "transactions", tx.txId.toString()));
+                }
+            } catch (error) {
+                alert("Error deleting: " + error.message);
+            }
         }
     };
-    // Clear both search and date filters
+
+    // --- MOBILE FILTER INPUT HELPER ---
+    window.formatMobileDateInput = function(input) {
+        let val = input.value.replace(/\D/g, '');
+        if (val.length > 2) val = val.slice(0, 2) + '-' + val.slice(2);
+        if (val.length > 5) val = val.slice(0, 5) + '-' + val.slice(5, 9);
+        input.value = val;
+    };
+
     window.clearLogFilters = function() {
         document.getElementById('logSearchInput').value = '';
         document.getElementById('logDateInput').value = '';
         render();
     };
 
+    // --- DYNAMIC DATA DISPLAY RENDER ENGINE ---
     function render() {
-        // 1. Render Customer Select Dropdown
+        // Dropdown Population
         const dropdown = document.getElementById('txCustId');
-        dropdown.innerHTML = '<option value="">-- Choose Customer --</option>';
-        customers.forEach(c => {
-            dropdown.innerHTML += `<option value="${c.id}">${c.name} (${c.id})</option>`;
-        });
+        if (dropdown) {
+            dropdown.innerHTML = '<option value="">-- Choose Customer --</option>';
+            customers.forEach(c => {
+                dropdown.innerHTML += `<option value="${c.id}">${c.name} (${c.id})</option>`;
+            });
+        }
 
-        // 2. Render Customers Table
+        // Customer Sheet Drawing
         const custBody = document.querySelector('#customerTable tbody');
-        custBody.innerHTML = '';
-        customers.forEach(c => {
-            custBody.innerHTML += `
-                <tr>
-                    <td>${c.id}</td>
-                    <td>${c.name}</td>
-                    <td>${c.phone}</td>
-                    <td><strong>${c.balance} Tk</strong></td>
-                    <td>
-                        <button class="btn-sm" style="background: #dc2626;" onclick="deleteCustomer('${c.id}')">🗑️ Delete</button>
-                    </td>
-                </tr>
-            `;
-        });
+        if (custBody) {
+            custBody.innerHTML = '';
+            customers.forEach(c => {
+                custBody.innerHTML += `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.phone}</td><td><strong>${c.balance} Tk</strong></td><td><button class="btn-sm" style="background: #dc2626;" onclick="deleteCustomer('${c.id}')">🗑️ Delete</button></td></tr>`;
+            });
+        }
 
-        // 3. Filter and Render Transaction History Table
+        // Filter and Draw History Log
         const txBody = document.querySelector('#historyTable tbody');
-        txBody.innerHTML = '';
+        if (txBody) {
+            txBody.innerHTML = '';
+            const searchQuery = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value.toLowerCase().trim() : '';
+            const filterInput = document.getElementById('logDateInput') ? document.getElementById('logDateInput').value : '';
 
-        // Get filter values
-        const searchQuery = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value.toLowerCase().trim() : '';
-        const filterDate = document.getElementById('logDateInput') ? document.getElementById('logDateInput').value : '';
+            const filteredTransactions = transactions.filter(t => {
+                const matchesSearch = t.custName.toLowerCase().includes(searchQuery) || t.custId.toLowerCase().includes(searchQuery);
+                if (filterInput.length < 10) return matchesSearch;
+                
+                const dateParts = t.date.split('-');
+                const recordDMY = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+                return matchesSearch && (recordDMY === filterInput);
+            });
 
-        // Filter transaction list dynamically
-        const filteredTransactions = transactions.filter(t => {
-            const matchesSearch = t.custName.toLowerCase().includes(searchQuery) || t.custId.toLowerCase().includes(searchQuery);
-            const matchesDate = filterDate === '' || t.date === filterDate;
-            return matchesSearch && matchesDate;
-        });
-
-        // Draw only the filtered results
-        filteredTransactions.forEach(t => {
-            txBody.innerHTML += `
-                <tr>
-                    <td>${t.date}</td>
-                    <td><strong>(${t.custId})</strong> ${t.custName}</td>
-                    <td style="color: ${t.type.includes('Received') ? 'green':'red'}">${t.type}</td>
-                    <td><strong>${t.amount} Tk</strong></td>
-                    <td>${t.method}</td>
-                    <td>
-                        <small>
-                            ${t.prevBal} 
-                            ${t.type === 'Payment Received' ? '-' : '+'} 
-                            ${t.amount} = 
-                            <strong>${t.currBal} Tk</strong>
-                        </small>
-                    </td>
-                    <td>
-                        <button class="btn-sm" onclick="sendReceipt(${t.txId})">📩 Send Receipt</button>
-                    </td>
-                </tr>
-            `;
-        });
+            filteredTransactions.forEach(t => {
+                txBody.innerHTML += `<tr><td>${t.date}</td><td><strong>(${t.custId})</strong> ${t.custName}</td><td style="color: ${t.type.includes('Received') ? 'green':'red'}">${t.type}</td><td><strong>${t.amount} Tk</strong></td><td>${t.method}</td><td><small>${t.prevBal} ${t.type === 'Payment Received' ? '-' : '+'} ${t.amount} = <strong>${t.currBal} Tk</strong></small></td><td><button class="btn-sm" onclick="sendReceipt(${t.txId})">📩 Send Receipt</button></td></tr>`;
+            });
+        }
     }
-
-    // Run on startup
-    render();
 </script>
 </body>
 </html>
