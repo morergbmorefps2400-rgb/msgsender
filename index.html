@@ -324,21 +324,39 @@
     // Initialize Database Core Engine
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    
-    // Configuration - Change your store details here!
+
+    // Dynamic Tracking Storage RAM arrays
+    let customers = [];
+    let transactions = [];
+
+    // Core configuration properties (Change your store details here if needed!)
     const STORE_NAME = "Ammaah Optics";
     const STORE_ADDRESS = "Patuatuli, Dhaka-1100";
     const STORE_PHONE = "01925771759";
-
-    // App Data Initialization
-    let customers = JSON.parse(localStorage.getItem('ledger_customers')) || [];
-    let transactions = JSON.parse(localStorage.getItem('ledger_transactions')) || [];
 
     document.getElementById('storeNameDisplay').innerText = STORE_NAME;
     document.getElementById('storeDetailsDisplay').innerText = `Address: ${STORE_ADDRESS} | Phone: ${STORE_PHONE}`;
     document.getElementById('txDate').valueAsDate = new Date();
 
-    // Navigation Logic: View individual interface pages
+    // --- AUTOMATIC LIVE DATABASE REAL-TIME SYNC STREAMS ---
+    onSnapshot(collection(db, "customers"), (snapshot) => {
+        customers = [];
+        snapshot.forEach((doc) => {
+            customers.push(doc.data());
+        });
+        window.render();
+    });
+
+    onSnapshot(collection(db, "transactions"), (snapshot) => {
+        transactions = [];
+        snapshot.forEach((doc) => {
+            transactions.push(doc.data());
+        });
+        transactions.sort((a, b) => b.txId - a.txId);
+        window.render();
+    });
+
+    // Navigation Routing Handlers
     window.showPage = function(pageId) {
         document.getElementById('dashboardMenu').style.display = 'none';
         document.querySelectorAll('.app-page').forEach(page => {
@@ -347,17 +365,16 @@
         document.getElementById(pageId).classList.add('active-page');
     };
 
-    // Navigation Logic: Return back to core dashboard screen
     window.showDashboard = function() {
         document.querySelectorAll('.app-page').forEach(page => {
             page.classList.remove('active-page');
         });
         document.getElementById('dashboardMenu').style.display = 'block';
-        render(); // Dynamic update execution on return
+        window.render();
     };
 
-    // Handle Adding New Customer
-    document.getElementById('customerForm').addEventListener('submit', (e) => {
+    // Customer Registration Sync Action
+    document.getElementById('customerForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('custId').value.trim();
         const name = document.getElementById('custName').value.trim();
@@ -373,17 +390,20 @@
             return;
         }
 
-        customers.push({ id, name, phone, balance: initialBalance });
-        saveData();
-        render();
-        document.getElementById('customerForm').reset();
-        showDashboard(); // Automatically return to menu after adding
+        const customerData = { id, name, phone, balance: initialBalance };
+
+        try {
+            await setDoc(doc(db, "customers", id), customerData);
+            document.getElementById('customerForm').reset();
+            window.showDashboard();
+        } catch (error) {
+            alert("Error syncing new customer profile data: " + error.message);
+        }
     });
 
-    // Automatically disable/enable Method dropdown based on Type selection
+    // Method disabling toggle configuration layout
     document.getElementById('txType').addEventListener('change', (e) => {
         const methodDropdown = document.getElementById('txMethod');
-        
         if (e.target.value === 'due') {
             methodDropdown.disabled = true;
             methodDropdown.required = false; 
@@ -396,8 +416,8 @@
         }
     });
 
-    // Handle Adding Transactions
-    document.getElementById('transactionForm').addEventListener('submit', (e) => {
+    // Transaction Calculation and Posting Sync Action
+    document.getElementById('transactionForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const custId = document.getElementById('txCustId').value;
         const date = document.getElementById('txDate').value;
@@ -410,15 +430,17 @@
         if (!customer) return;
 
         const previousBalance = customer.balance;
+        let newBalance = previousBalance;
 
         if (type === 'payment') {
-            customer.balance -= amount;
+            newBalance -= amount;
         } else {
-            customer.balance += amount;
+            newBalance += amount;
         }
 
-        transactions.unshift({
-            txId: Date.now(),
+        const txId = Date.now().toString();
+        const transactionData = {
+            txId: parseInt(txId),
             date,
             custId,
             custName: customer.name,
@@ -427,58 +449,32 @@
             amount,
             method: finalMethod,
             prevBal: previousBalance,
-            currBal: customer.balance
-        });
+            currBal: newBalance
+        };
 
-        saveData();
-        render();
-        document.getElementById('txAmount').value = '';
-        showDashboard(); // Automatically return to menu after submitting
+        try {
+            await setDoc(doc(db, "customers", custId), { ...customer, balance: newBalance });
+            await setDoc(doc(db, "transactions", txId), transactionData);
+            document.getElementById('txAmount').value = '';
+            window.showDashboard();
+        } catch (error) {
+            alert("Transaction posting verification failed: " + error.message);
+        }
     });
 
-    function saveData() {
-        localStorage.setItem('ledger_customers', JSON.stringify(customers));
-        localStorage.setItem('ledger_transactions', JSON.stringify(transactions));
-    }
-
-    // Function to Generate and Send Custom WhatsApp Receipts
+    // WhatsApp Receipt Construction Formatting
     window.sendReceipt = function(txId) {
         const tx = transactions.find(t => t.txId === txId);
         if (!tx) return;
 
-        const originalDate = tx.date;
-        const dateParts = originalDate.split('-');
+        const dateParts = tx.date.split('-');
         const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-
         let msg = "";
 
         if (tx.type === 'Payment Received') {
-            msg = `Dear *${tx.custName}*,\n\n`;
-            msg += `Your payment has been received successfully. ✅\n\n`;
-            msg += `🧾 *PAYMENT RECEIPT*\n\n`;
-            msg += `📅 Date: ${formattedDate}\n`;
-            msg += `💳 Transaction Type: ${tx.type}\n`;
-            msg += `💰 Amount Received: ৳${tx.amount}\n`;
-            msg += `⚙️ Payment Method: ${tx.method}\n\n`;
-            msg += `📊 *ACCOUNT SUMMARY*\n\n`;
-            msg += `📉 Previous Balance: ৳${tx.prevBal}\n`;
-            msg += `🔹 Amount Paid: ৳${tx.amount}\n`;
-            msg += `*✅ Current Balance: ৳${tx.currBal}*\n\n`;
-            msg += `Thank you for your payment. 🙏\n\n`;
-            msg += `*"${STORE_NAME}"*`;
+            msg = `Dear *${tx.custName}*,\n\nYour payment has been received successfully. ✅\n\n🧾 *PAYMENT RECEIPT*\n\n📅 Date: ${formattedDate}\n💳 Transaction Type: ${tx.type}\n💰 Amount Received: ৳${tx.amount}\n⚙️ Payment Method: ${tx.method}\n\n📊 *ACCOUNT SUMMARY*\n\n📉 Previous Balance: ৳${tx.prevBal}\n🔹 Amount Paid: ৳${tx.amount}\n*✅ Current Balance: ৳${tx.currBal}*\n\nThank you for your payment. 🙏\n\n*"${STORE_NAME}"*`;
         } else {
-            msg = `Dear *${tx.custName}*,\n\n`;
-            msg += `A credit sale has been recorded successfully. 🛒\n\n`;
-            msg += `📦 *CREDIT SALE RECEIPT*\n\n`;
-            msg += `📅 Date: ${formattedDate}\n`;
-            msg += `📝 Transaction Type: ${tx.type}\n`;
-            msg += `🛍️ Sale Amount: ৳${tx.amount}\n\n`;
-            msg += `📊 *ACCOUNT SUMMARY*\n\n`;
-            msg += `📈 Previous Balance: ৳${tx.prevBal}\n`;
-            msg += `🔸 New Credit: ৳${tx.amount}\n`;
-            msg += `*⚠️ Current Balance: ৳${tx.currBal}*\n\n`;
-            msg += `Thank you for your purchase. 👍\n\n`;
-            msg += `*"${STORE_NAME}"*`;
+            msg = `Dear *${tx.custName}*,\n\nA credit sale has been recorded successfully. 🛒\n\n📦 *CREDIT SALE RECEIPT*\n\n📅 Date: ${formattedDate}\n📝 Transaction Type: ${tx.type}\n🛍️ Sale Amount: ৳${tx.amount}\n\n📊 *ACCOUNT SUMMARY*\n\n📈 Previous Balance: ৳${tx.prevBal}\n🔸 New Credit: ৳${tx.amount}\n*⚠️ Current Balance: ৳${tx.currBal}*\n\nThank you for your purchase. 👍\n\n*"${STORE_NAME}"*`;
         }
 
         const encodedMsg = encodeURIComponent(msg);
@@ -486,94 +482,92 @@
         window.open(url, '_blank');
     };
 
-    // Function to Delete a Customer with Confirmation
-    window.deleteCustomer = function(id) {
+    // Customer Target Wiping Sync Handler
+    window.deleteCustomer = async function(id) {
         const customer = customers.find(c => c.id === id);
         if (!customer) return;
 
         const confirmDelete = confirm(`Are you sure you want to delete the customer "${customer.name}" (ID: ${customer.id})?`);
-        
         if (confirmDelete) {
-            customers = customers.filter(c => c.id !== id);
-            transactions = transactions.filter(t => t.custId !== id);
-            saveData();
-            render();
+            try {
+                await deleteDoc(doc(db, "customers", id));
+                const linkedTx = transactions.filter(t => t.custId === id);
+                for (let tx of linkedTx) {
+                    await deleteDoc(doc(db, "transactions", tx.txId.toString()));
+                }
+            } catch (error) {
+                alert("Execution error removing profile entries: " + error.message);
+            }
         }
     };
 
-    // Clear both search and date filters
     window.clearLogFilters = function() {
         document.getElementById('logSearchInput').value = '';
         document.getElementById('logDateInput').value = '';
         window.render();
     };
 
+    // Unified Screen Display Matrix Drawing Handler
     window.render = function() {
-        // 1. Render Customer Select Dropdown
         const dropdown = document.getElementById('txCustId');
-        dropdown.innerHTML = '<option value="">-- Choose Customer --</option>';
-        customers.forEach(c => {
-            dropdown.innerHTML += `<option value="${c.id}">${c.name} (${c.id})</option>`;
-        });
+        if (dropdown) {
+            dropdown.innerHTML = '<option value="">-- Choose Customer --</option>';
+            customers.forEach(c => {
+                dropdown.innerHTML += `<option value="${c.id}">${c.name} (${c.id})</option>`;
+            });
+        }
 
-        // 2. Render Customers Table
         const custBody = document.querySelector('#customerTable tbody');
-        custBody.innerHTML = '';
-        customers.forEach(c => {
-            custBody.innerHTML += `
-                <tr>
-                    <td>${c.id}</td>
-                    <td>${c.name}</td>
-                    <td>${c.phone}</td>
-                    <td><strong>${c.balance} Tk</strong></td>
-                    <td>
-                        <button class="btn-sm" style="background: #dc2626;" onclick="deleteCustomer('${c.id}')">🗑️ Delete</button>
-                    </td>
-                </tr>
-            `;
-        });
+        if (custBody) {
+            custBody.innerHTML = '';
+            if (customers.length === 0) {
+                custBody.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center; padding:20px;">No registered accounts found. Go to "Register New Customer" to add one!</td></tr>';
+            } else {
+                customers.forEach(c => {
+                    custBody.innerHTML += `
+                        <tr>
+                            <td>${c.id}</td>
+                            <td>${c.name}</td>
+                            <td>${c.phone}</td>
+                            <td><strong>${c.balance} Tk</strong></td>
+                            <td><button class="btn-sm" style="background: #dc2626;" onclick="deleteCustomer('${c.id}')">🗑️ Delete</button></td>
+                        </tr>`;
+                });
+            }
+        }
 
-        // 3. Filter and Render Transaction History Table
         const txBody = document.querySelector('#historyTable tbody');
-        txBody.innerHTML = '';
+        if (txBody) {
+            txBody.innerHTML = '';
+            const searchQuery = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value.toLowerCase().trim() : '';
+            const filterDate = document.getElementById('logDateInput') ? document.getElementById('logDateInput').value : '';
 
-        // Get filter values
-        const searchQuery = document.getElementById('logSearchInput') ? document.getElementById('logSearchInput').value.toLowerCase().trim() : '';
-        const filterDate = document.getElementById('logDateInput') ? document.getElementById('logDateInput').value : '';
+            const filteredTransactions = transactions.filter(t => {
+                const matchesSearch = t.custName.toLowerCase().includes(searchQuery) || t.custId.toLowerCase().includes(searchQuery);
+                const matchesDate = filterDate === '' || t.date === filterDate;
+                return matchesSearch && matchesDate;
+            });
 
-        // Filter transaction list dynamically
-        const filteredTransactions = transactions.filter(t => {
-            const matchesSearch = t.custName.toLowerCase().includes(searchQuery) || t.custId.toLowerCase().includes(searchQuery);
-            const matchesDate = filterDate === '' || t.date === filterDate;
-            return matchesSearch && matchesDate;
-        });
-
-        // Draw only the filtered results
-        filteredTransactions.forEach(t => {
-            txBody.innerHTML += `
-                <tr>
-                    <td>${t.date}</td>
-                    <td><strong>(${t.custId})</strong> ${t.custName}</td>
-                    <td style="color: ${t.type.includes('Received') ? 'green':'red'}">${t.type}</td>
-                    <td><strong>${t.amount} Tk</strong></td>
-                    <td>${t.method}</td>
-                    <td>
-                        <small>
-                            ${t.prevBal} 
-                            ${t.type === 'Payment Received' ? '-' : '+'} 
-                            ${t.amount} = 
-                            <strong>${t.currBal} Tk</strong>
-                        </small>
-                    </td>
-                    <td>
-                        <button class="btn-sm" onclick="sendReceipt(${t.txId})">📩 Send Receipt</button>
-                    </td>
-                </tr>
-            `;
-        });
+            if (filteredTransactions.length === 0) {
+                txBody.innerHTML = '<tr><td colspan="7" class="text-muted" style="text-align:center; padding:20px;">No transaction logs match your criteria.</td></tr>';
+            } else {
+                filteredTransactions.forEach(t => {
+                    txBody.innerHTML += `
+                        <tr>
+                            <td>${t.date}</td>
+                            <td><strong>(${t.custId})</strong> ${t.custName}</td>
+                            <td style="color: ${t.type.includes('Received') ? 'green':'red'}">${t.type}</td>
+                            <td><strong>${t.amount} Tk</strong></td>
+                            <td>${t.method}</td>
+                            <td><small>${t.prevBal} ${t.type === 'Payment Received' ? '-' : '+'} ${t.amount} = <strong>${t.currBal} Tk</strong></small></td>
+                            <td><button class="btn-sm" onclick="sendReceipt(${t.txId})">📩 Send Receipt</button></td>
+                        </tr>`;
+                });
+            }
+        }
     }
 
-    // Run on startup
+    // Initialize execution map parameters
     window.render();
 </script>
 </body>
