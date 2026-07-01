@@ -462,8 +462,7 @@
         }
     });
 
-    // WhatsApp Receipt Construction Formatting
-   // WhatsApp Receipt Construction Formatting
+  // WhatsApp Receipt Construction Formatting
     window.sendReceipt = function(txId) {
         const tx = transactions.find(t => t.txId === txId);
         if (!tx) return;
@@ -475,11 +474,11 @@
         let msg = "";
 
         if (tx.type === 'Payment Received') {
-            // Live Dynamic Payment Template
-            msg = `*${STORE_NAME}*\n\nYour payment of *৳${tx.amount}* has been received.\n\n*${formattedDate} | ${tx.method}*\n\nPrevious Balance: *৳${tx.prevBal}*\nCurrent Balance: *৳${tx.currBal}*\n\nThank you for your payment.`;
+            // First line: Customer Name & Unique ID | Last line: Shop Name
+            msg = `*${tx.custName} (${tx.custId})*\n\nYour payment of *৳${tx.amount}* has been received.\n\n*${formattedDate} | ${tx.method}*\n\nPrevious Balance: *৳${tx.prevBal}*\nCurrent Balance: *৳${tx.currBal}*\n\nThank you for your payment.\n\n*${STORE_NAME}*`;
         } else {
-            // Live Dynamic Purchase Template
-            msg = `*${STORE_NAME}*\n\nYour purchase of *৳${tx.amount}* has been added to your balance.\n\n*${formattedDate}*\n\nPrevious Balance: *৳${tx.prevBal}*\nCurrent Balance: *৳${tx.currBal}*\n\nThank you for your purchase.`;
+            // First line: Customer Name & Unique ID | Last line: Shop Name
+            msg = `*${tx.custName} (${tx.custId})*\n\nYour purchase of *৳${tx.amount}* has been added to your balance.\n\n*${formattedDate}*\n\nPrevious Balance: *৳${tx.prevBal}*\nCurrent Balance: *৳${tx.currBal}*\n\nThank you for your purchase.\n\n*${STORE_NAME}*`;
         }
 
         const encodedMsg = encodeURIComponent(msg);
