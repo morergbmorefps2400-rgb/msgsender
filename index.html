@@ -463,18 +463,23 @@
     });
 
     // WhatsApp Receipt Construction Formatting
+   // WhatsApp Receipt Construction Formatting
     window.sendReceipt = function(txId) {
         const tx = transactions.find(t => t.txId === txId);
         if (!tx) return;
 
+        // Formats date from YYYY-MM-DD to DD-MM-YYYY dynamically
         const dateParts = tx.date.split('-');
         const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+        
         let msg = "";
 
         if (tx.type === 'Payment Received') {
-            msg = `Dear *${tx.custName}*,\n\nYour payment has been received successfully. ✅\n\n🧾 *PAYMENT RECEIPT*\n\n📅 Date: ${formattedDate}\n💳 Transaction Type: ${tx.type}\n💰 Amount Received: ৳${tx.amount}\n⚙️ Payment Method: ${tx.method}\n\n📊 *ACCOUNT SUMMARY*\n\n📉 Previous Balance: ৳${tx.prevBal}\n🔹 Amount Paid: ৳${tx.amount}\n*✅ Current Balance: ৳${tx.currBal}*\n\nThank you for your payment. 🙏\n\n*"${STORE_NAME}"*`;
+            // Live Dynamic Payment Template
+            msg = `*${STORE_NAME}*\n\nYour payment of *৳${tx.amount}* has been received.\n\n*${formattedDate} | ${tx.method}*\n\nPrevious Balance: *৳${tx.prevBal}*\nCurrent Balance: *৳${tx.currBal}*\n\nThank you for your payment.`;
         } else {
-            msg = `Dear *${tx.custName}*,\n\nA credit sale has been recorded successfully. 🛒\n\n📦 *CREDIT SALE RECEIPT*\n\n📅 Date: ${formattedDate}\n📝 Transaction Type: ${tx.type}\n🛍️ Sale Amount: ৳${tx.amount}\n\n📊 *ACCOUNT SUMMARY*\n\n📈 Previous Balance: ৳${tx.prevBal}\n🔸 New Credit: ৳${tx.amount}\n*⚠️ Current Balance: ৳${tx.currBal}*\n\nThank you for your purchase. 👍\n\n*"${STORE_NAME}"*`;
+            // Live Dynamic Purchase Template
+            msg = `*${STORE_NAME}*\n\nYour purchase of *৳${tx.amount}* has been added to your balance.\n\n*${formattedDate}*\n\nPrevious Balance: *৳${tx.prevBal}*\nCurrent Balance: *৳${tx.currBal}*\n\nThank you for your purchase.`;
         }
 
         const encodedMsg = encodeURIComponent(msg);
